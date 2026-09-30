@@ -13,6 +13,7 @@ from .entry_point import (
 )
 from .keys import ModelKey
 from .types import ModelDict
+from .union import model_union
 
 __all__ = [
     "ModelDict",
@@ -23,6 +24,7 @@ __all__ = [
     "entry_point_to_path",
     "filter_models",
     "get_registered_model",
+    "model_union",
     "resolve_entry_point_key",
     "split_entry_point",
     "tag",

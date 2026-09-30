@@ -5,29 +5,25 @@ import io
 import json
 import sys
 from collections import Counter, defaultdict
-from functools import reduce
-from operator import or_
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import cast
 
 import click
 import yaml
-from pydantic import BaseModel, Field, Tag, TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from rich.console import Console
 from rich.text import Text
 from yamlcore import CoreLoader  # type: ignore
 
 from overture.schema.system.discovery import (
-    ModelDict,
     ModelKey,
     TagSelector,
     discover_models,
     filter_models,
+    model_union,
 )
 from overture.schema.system.discovery.tag import get_values_for_key
-from overture.schema.system.feature import Feature
 from overture.schema.system.json_schema import json_schema
-from overture.schema.system.typing_util import single_literal_value
 
 from .error_formatting import (
     format_validation_error,
@@ -49,91 +45,8 @@ def _is_geojson_feature(data: dict) -> bool:
     return data.get("type") == "Feature" and "properties" in data
 
 
-def _can_discriminate(model_class: object, key: ModelKey) -> bool:
-    """Check if a model can participate in a discriminated union.
-
-    Returns True if the model is a model class tagged `overture` with a single literal
-    'type' value. The class check is separate from the tag: `segment` is tagged
-    `overture` but is an `Annotated` union, not a model class.
-    """
-    return (
-        isinstance(model_class, type)
-        and issubclass(model_class, BaseModel)
-        and "overture" in key.tags
-        and _type_literal(model_class) is not None
-    )
-
-
-def _type_literal(feature_class: type[BaseModel]) -> str | None:
-    """Extract the literal value from a feature model's 'type' field.
-
-    Returns the literal type value, or None if not a single string literal.
-    """
-    if "type" not in feature_class.model_fields:
-        return None
-    value = single_literal_value(feature_class.model_fields["type"].annotation)
-    return value if isinstance(value, str) else None
-
-
-def _discriminated_union(feature_classes: tuple[type[BaseModel], ...]) -> Any:  # noqa: ANN401
-    """Create a discriminated union of feature models on the 'type' field."""
-    if not feature_classes:
-        return None
-    elif len(feature_classes) == 1:
-        # Single model doesn't need a discriminated union
-        return feature_classes[0]
-
-    return Annotated[
-        reduce(
-            or_,
-            (Annotated[f, Tag(cast(str, _type_literal(f)))] for f in feature_classes),
-        ),
-        Field(discriminator=Feature.field_discriminator("type", *feature_classes)),
-    ]
-
-
-def create_union_type_from_models(
-    models: ModelDict,
-) -> UnionType:
-    """Create a union type from a dict of models.
-
-    Uses discriminated unions for `overture`-tagged features when possible for better
-    performance.
-
-    Args
-    ----
-        models: Dict mapping ModelKey to Pydantic model classes
-
-    Returns
-    -------
-        Union type suitable for TypeAdapter
-    """
-    if not models:
-        raise ValueError("No models provided")
-
-    # Separate models that can be discriminated from those that cannot
-    discriminated_models = tuple(
-        m for key, m in models.items() if _can_discriminate(m, key)
-    )
-    discriminated_union = _discriminated_union(discriminated_models)
-
-    non_discriminated_models = [
-        m for key, m in models.items() if not _can_discriminate(m, key)
-    ]
-    # Use None only if list is empty, otherwise build union
-    non_discriminated_union = (
-        reduce(or_, non_discriminated_models) if non_discriminated_models else None
-    )
-
-    # Combine discriminated and non-discriminated unions
-    if discriminated_union and non_discriminated_union:
-        return discriminated_union | non_discriminated_union
-    elif discriminated_union:
-        return discriminated_union
-    elif non_discriminated_union:
-        return non_discriminated_union
-    else:
-        raise RuntimeError("No valid models found")
+# The CLI's name for the -system union builder, kept as part of its public API.
+create_union_type_from_models = model_union
 
 
 def validate_feature(data: dict, model_type: UnionType) -> BaseModel:
