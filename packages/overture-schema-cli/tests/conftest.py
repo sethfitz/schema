@@ -24,7 +24,7 @@ def stderr_buffer() -> Generator[StringIO, None, None]:
     buffer = StringIO()
     captured_console = Console(file=buffer, force_terminal=False)
 
-    with patch("overture.schema.cli.commands.stderr", captured_console):
+    with patch("overture.schema.validation.command.stderr", captured_console):
         yield buffer
 
 

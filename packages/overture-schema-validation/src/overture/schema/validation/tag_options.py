@@ -1,0 +1,74 @@
+"""Shared Click options for tag-based model selection.
+
+A copy of `overture.schema.cli.tag_options`: the validate command lives here and
+`-cli` depends on this package, so neither can import the other's. Keep the two
+in step until TARN-163 gives them a shared home.
+"""
+
+from collections.abc import Callable
+from typing import TypeVar
+
+import click
+
+from overture.schema.system.discovery import TagSelector
+
+F = TypeVar("F", bound=Callable[..., object])
+
+# Every tag named here must be one discovery actually emits -- a tag in help
+# text reads as runnable. The namespaced form has no shipped example, so it is
+# described rather than illustrated.
+_TAG_SYNTAX_NOTE = (
+    "Accepts plain tags (e.g. feature, overture) and compound key/value tags "
+    "(e.g. overture:theme=buildings). A namespaced form, namespace:predicate, "
+    "is also accepted for tags that third-party packages register."
+)
+
+
+def tag_selection_options(func: F) -> F:
+    """Decorate a Click command with --tag, --filter, and --exclude options.
+
+    The decorated command receives `tags`, `filters`, and `excludes`
+    keyword arguments (each a `tuple[str, ...]`), suitable for passing to
+    `build_selector`.
+    """
+    func = click.option(
+        "--exclude",
+        "excludes",
+        multiple=True,
+        help=(
+            "Exclude feature types with these tags — removes from scope (OR-NOT; "
+            f"repeatable). {_TAG_SYNTAX_NOTE}"
+        ),
+    )(func)
+    func = click.option(
+        "--filter",
+        "filters",
+        multiple=True,
+        help=(
+            "Require feature types to have these tags — narrows scope (AND; "
+            f"repeatable). {_TAG_SYNTAX_NOTE}"
+        ),
+    )(func)
+    func = click.option(
+        "--tag",
+        "tags",
+        multiple=True,
+        help=(
+            "Include feature types with these tags — defines scope (OR; repeatable). "
+            f"{_TAG_SYNTAX_NOTE}"
+        ),
+    )(func)
+    return func
+
+
+def build_selector(
+    tags: tuple[str, ...],
+    filters: tuple[str, ...],
+    excludes: tuple[str, ...],
+) -> TagSelector:
+    """Map `tag_selection_options` arguments to a `TagSelector`."""
+    return TagSelector(
+        include_any=tags,
+        require_all=filters,
+        exclude_any=excludes,
+    )

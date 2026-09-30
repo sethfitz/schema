@@ -15,6 +15,10 @@ readme = "README.md"
 dependencies = [
     "overture-schema-system>=2.0.0",
     "pydantic>=2.12.0",
+    "pyyaml>=6.0.2",
+    "click>=8.1",
+    "rich>=13.0",
+    "yamlcore>=0.0.4",
 ]
 
 [project.urls]
@@ -24,12 +28,6 @@ Issues = "https://github.com/OvertureMaps/schema/issues"
 
 [tool.uv.sources]
 overture-schema-system = { workspace = true }
-
-[dependency-groups]
-dev = [
-    "pyyaml>=6.0.2",
-    "yamlcore>=0.0.4",
-]
 
 [tool.uv.build-backend]
 module-name = "overture.schema.validation"

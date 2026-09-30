@@ -1,4 +1,4 @@
-"""Click-based CLI for overture-schema package."""
+"""The `validate` command of the `overture-schema` CLI."""
 
 import builtins
 import io
@@ -12,19 +12,13 @@ import click
 import yaml
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from rich.console import Console
-from rich.text import Text
 from yamlcore import CoreLoader  # type: ignore
 
 from overture.schema.system.discovery import (
-    ModelKey,
-    TagSelector,
     discover_models,
     filter_models,
     model_union,
 )
-from overture.schema.system.discovery.tag import get_values_for_key
-from overture.schema.system.json_schema import json_schema
-from overture.schema.validation.command import validate_command
 
 from .error_formatting import (
     format_validation_error,
@@ -44,10 +38,6 @@ stderr = Console(highlight=False, file=sys.stderr)
 def _is_geojson_feature(data: dict) -> bool:
     """Check if data is in GeoJSON Feature format."""
     return data.get("type") == "Feature" and "properties" in data
-
-
-# The CLI's name for the -system union builder, kept as part of its public API.
-create_union_type_from_models = model_union
 
 
 def validate_feature(data: dict, model_type: UnionType) -> BaseModel:
@@ -103,21 +93,6 @@ def validate_features(data: list, model_type: UnionType) -> list[BaseModel]:
     return cast(list[BaseModel], adapter.validate_python(data))
 
 
-def resolve_types(
-    selector: TagSelector = TagSelector(),
-    *,
-    type_names: tuple[str, ...] = (),
-) -> UnionType:
-    """Resolve a TagSelector + type-names into a Pydantic union type."""
-    models = discover_models()
-    models = filter_models(models, selector, type_names=type_names)
-
-    if not models:
-        raise ValueError("No models found matching the specified criteria")
-
-    return create_union_type_from_models(models)
-
-
 def get_source_name(filename: Path) -> str:
     """Get display name for input source.
 
@@ -130,40 +105,6 @@ def get_source_name(filename: Path) -> str:
         Display name: "<stdin>" for stdin input, otherwise the filename
     """
     return "<stdin>" if str(filename) == "-" else str(filename)
-
-
-# Every `# noqa: D301` below is the same waiver, against `pydocstyle` (see
-# the docformat-only target). D301 wants a raw string wherever a docstring
-# contains a backslash, but `\b` here is Click's no-rewrap marker: a raw
-# string hands Click two literal characters and every example block collapses
-# into one paragraph. Any new command with an Examples block needs the waiver
-# too. Note the placement is pydocstyle's -- ruff reports D301 at the
-# docstring line instead, so selecting ruff's `D` rules would need its own.
-@click.group()
-@click.version_option(package_name="overture-schema")
-def cli() -> None:  # noqa: D301
-    """Overture Schema command-line interface.
-
-    Provides validation, schema generation, and type discovery for Overture Maps data.
-
-    \b
-    Examples:
-      # Validate a file
-      $ overture-schema validate data.json
-    \b
-      # Validate from stdin
-      $ overture-schema validate - < data.json
-    \b
-      # List available types
-      $ overture-schema list-types
-    \b
-      # Generate JSON schema
-      $ overture-schema json-schema --tag overture:theme=buildings
-    \b
-      # Validate specific types
-      $ overture-schema validate --tag overture:theme=buildings data.json
-    """
-    pass
 
 
 def load_input(filename: Path) -> tuple[dict | list, str]:
@@ -629,133 +570,88 @@ def handle_generic_error(e: Exception, filename: Path, error_type: str) -> None:
         raise click.UsageError(f"Error processing {source_name}: {e}")
 
 
-cli.add_command(validate_command)
-
-
-@cli.command("json-schema")
+# `# noqa: D301` waives pydocstyle's raw-string rule: `\b` in the docstring is
+# Click's no-rewrap marker, and a raw string would print it literally. See the
+# same waiver in `overture.schema.cli.commands`.
+@click.command("validate")
+@click.argument("filename", type=click.Path(path_type=Path), required=True)
 @tag_selection_options
 @click.option(
     "--type",
     "types",
     multiple=True,
-    help="Specific type to generate schema for (e.g., building, segment)",
+    help="Specific type to validate against (e.g., building, segment)",
 )
-def json_schema_command(
+@click.option(
+    "--show-field",
+    "show_fields",
+    multiple=True,
+    help="Field to display alongside errors (e.g., id, version). Can be repeated.",
+)
+def validate_command(
+    filename: Path,
     tags: tuple[str, ...],
     filters: tuple[str, ...],
     excludes: tuple[str, ...],
     types: tuple[str, ...],
+    show_fields: tuple[str, ...],
 ) -> None:  # noqa: D301
-    """Generate JSON schema for Overture Maps types.
+    """Validate Overture Maps data against schemas.
 
-    Outputs a JSON Schema document to stdout that can be used for validation
-    or documentation purposes.
+    Read from FILENAME or stdin if FILENAME is '-'.
+    Supports JSON, YAML, and GeoJSON formats.
 
     \b
     Examples:
-      # All types
-      $ overture-schema json-schema > schema.json
+      # Validate a file
+      $ overture-schema validate data.json
     \b
-      # Buildings theme by tag
-      $ overture-schema json-schema --tag overture:theme=buildings
+      # Validate from stdin
+      $ overture-schema validate - < data.json
     \b
-      # Specific types
-      $ overture-schema json-schema --type building
+      # Validate only buildings
+      $ overture-schema validate --tag overture:theme=buildings data.json
+    \b
+      # Validate specific type
+      $ overture-schema validate --type building data.json
     \b
       # Two themes at once (repeatable; scope is their union)
-      $ overture-schema json-schema --tag overture:theme=buildings \\
-          --tag overture:theme=places
+      $ overture-schema validate --tag overture:theme=buildings \\
+          --tag overture:theme=places data.json
     \b
       # Only types built on the Overture feature model
-      $ overture-schema json-schema --tag overture
+      $ overture-schema validate --tag overture data.json
     """
+    # Resolve model type first (errors here are ValueErrors, not ValidationErrors)
     try:
-        model_type = resolve_types(
-            build_selector(tags, filters, excludes), type_names=types
+        models = filter_models(
+            discover_models(),
+            build_selector(tags, filters, excludes),
+            type_names=types,
         )
-        schema = json_schema(model_type)
-        # Use plain print for JSON output to avoid Rich formatting
-        print(json.dumps(schema, indent=2, sort_keys=True))
+        if not models:
+            raise ValueError("No models found matching the specified criteria")
+        model_type = model_union(models)
     except ValueError as e:
-        raise click.UsageError(str(e)) from e
+        handle_generic_error(e, filename, "value")
+        return
 
-
-@cli.command("list-types")
-@tag_selection_options
-@click.option(
-    "--group-by",
-    help="Group types by a key/value tag's key, as in "
-    "--group-by overture:theme. "
-    "Plain and namespaced tags have no value to group by and are "
-    "ignored here.",
-)
-def list_types(
-    tags: tuple[str, ...],
-    filters: tuple[str, ...],
-    excludes: tuple[str, ...],
-    group_by: str | None,
-) -> None:  # noqa: D301
-    """List all available types.
-
-    Displays all registered models and can be organized by grouping.
-
-    \b
-    Examples:
-      # List all types
-      $ overture-schema list-types
-    \b
-      # One theme
-      $ overture-schema list-types --tag overture:theme=buildings
-    \b
-      # Group the listing by theme
-      $ overture-schema list-types --group-by overture:theme
-    """
+    # Load input (errors here are YAMLErrors or ValueErrors, not ValidationErrors)
     try:
-        models = discover_models()
-        models = filter_models(models, build_selector(tags, filters, excludes))
+        data, source_name = load_input(filename)
+    except yaml.YAMLError as e:
+        handle_generic_error(e, filename, "yaml")
+        return
+    except KeyError as e:
+        handle_generic_error(e, filename, "key")
+        return
 
-        if group_by:
-            grouped_models: dict[str, set[ModelKey]] = {}
-
-            for key in models.keys():
-                if groups := get_values_for_key(key.tags, group_by):
-                    for group in groups:
-                        grouped_models.setdefault(group, set()).add(key)
-
-            padding = (
-                max(
-                    (len(key.name) for keys in grouped_models.values() for key in keys),
-                    default=0,
-                )
-                + 2
-            )
-
-            for group, keys in sorted(grouped_models.items()):
-                stdout.print(
-                    f"[green bold]{group_by}={group} ({len(keys)})[/green bold]"
-                )
-                for key in sorted(keys, key=lambda k: k.name):
-                    model = Text()
-                    model.append("→ ", style="bright_black")
-                    model.append(key.name, style="bold cyan")
-                    model.pad_right(max(1, padding - len(key.name)))
-                    model.append("  ".join(sorted(key.tags)))
-                    stdout.print(model)
-                stdout.print()
-
-        else:
-            padding = max((len(key.name) for key in models.keys()), default=0) + 2
-
-            for key in sorted(models.keys(), key=lambda k: k.name):
-                model = Text()
-                model.append(key.name, style="bold cyan")
-                model.pad_right(max(1, padding - len(key.name)))
-                model.append("  ".join(sorted(key.tags)))
-                stdout.print(model)
-
-    except Exception as e:
-        click.echo(f"Error listing types: {e}", err=True)
-
-
-if __name__ == "__main__":
-    cli()
+    # Perform validation (now model_type and data are guaranteed to be defined)
+    try:
+        perform_validation(data, model_type)
+        stdout.print(f"✓ Successfully validated {source_name}")
+    except ValidationError as e:
+        handle_validation_error(
+            e, model_type, stderr, original_data=data, show_fields=list(show_fields)
+        )
+        sys.exit(1)
