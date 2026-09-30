@@ -5,8 +5,7 @@ from typing import Annotated, Any, cast
 
 from pydantic import BaseModel, Field, Tag, TypeAdapter
 
-from overture.schema.common import OvertureFeature
-from overture.schema.system.discovery import discover_models
+from overture.schema.system.discovery import ModelKey, discover_models
 from overture.schema.system.feature import Feature
 from overture.schema.system.typing_util import single_literal_value
 
@@ -75,13 +74,13 @@ def _union_type_adapter() -> TypeAdapter:
     if not models:
         raise RuntimeError("no registered models found via entry points")
 
-    discriminated_models: tuple[type[OvertureFeature], ...] = tuple(
-        cast(type[OvertureFeature], m) for m in models.values() if _can_discriminate(m)
+    discriminated_models: tuple[type[BaseModel], ...] = tuple(
+        m for key, m in models.items() if _can_discriminate(m, key)
     )
     discriminated_union: UnionType | None = _discriminated_union(discriminated_models)
 
     non_discriminated_models: tuple[type[BaseModel], ...] = tuple(
-        m for m in models.values() if not _can_discriminate(m)
+        m for key, m in models.items() if not _can_discriminate(m, key)
     )
     non_discriminated_union: type[BaseModel] | UnionType | None = (
         reduce(or_, non_discriminated_models) if non_discriminated_models else None
@@ -101,10 +100,10 @@ def _union_type_adapter() -> TypeAdapter:
 
 
 def _discriminated_union(
-    feature_classes: tuple[type[OvertureFeature], ...],
+    feature_classes: tuple[type[BaseModel], ...],
 ) -> Any:  # noqa: ANN401
     """
-    Create a discriminated union of the Overture features since they can be discriminated on the
+    Create a discriminated union of the feature models since they can be discriminated on the
     `type` field. This is just a performance optimization, and the union will work even if no models
     are discriminated.
     """
@@ -123,27 +122,31 @@ def _discriminated_union(
         ]
 
 
-def _can_discriminate(model_class: object) -> bool:
+def _can_discriminate(model_class: object, key: ModelKey) -> bool:
     """
     Return true if given value can participate in a discriminated union on the `type` field because
-    it is an Overture feature with where the `type` field has a single literal value.
+    it is a model class tagged `overture` where the `type` field has a single literal value.
+
+    The class check is separate from the tag: `segment` is tagged `overture` but is an `Annotated`
+    union, not a model class.
     """
     return (
         isinstance(model_class, type)
-        and issubclass(model_class, OvertureFeature)
-        and _type_literal(cast(type[OvertureFeature], model_class)) is not None
+        and issubclass(model_class, BaseModel)
+        and "overture" in key.tags
+        and _type_literal(model_class) is not None
     )
 
 
-def _type_literal(feature_class: type[OvertureFeature]) -> object:
+def _type_literal(feature_class: type[BaseModel]) -> object:
     """
-    Return the literal value of the Overture Feature model's `type` field, if it has one, or `None`
+    Return the literal value of the feature model's `type` field, if it has one, or `None`
     if it does not.
 
     Parameters
     ----------
-    feature_class : type[OvertureFeature]
-        Overture feature model class
+    feature_class : type[BaseModel]
+        Feature model class
 
     Returns
     -------

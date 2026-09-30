@@ -17,7 +17,6 @@ from rich.console import Console
 from rich.text import Text
 from yamlcore import CoreLoader  # type: ignore
 
-from overture.schema.common import OvertureFeature
 from overture.schema.system.discovery import (
     ModelDict,
     ModelKey,
@@ -50,19 +49,23 @@ def _is_geojson_feature(data: dict) -> bool:
     return data.get("type") == "Feature" and "properties" in data
 
 
-def _can_discriminate(model_class: object) -> bool:
+def _can_discriminate(model_class: object, key: ModelKey) -> bool:
     """Check if a model can participate in a discriminated union.
 
-    Returns True if the model is an OvertureFeature with a single literal 'type' value.
+    Returns True if the model is a model class tagged `overture` with a single literal
+    'type' value. The class check is separate from the tag: `segment` is tagged
+    `overture` but is an `Annotated` union, not a model class.
     """
-    if not (isinstance(model_class, type) and issubclass(model_class, OvertureFeature)):
-        return False
+    return (
+        isinstance(model_class, type)
+        and issubclass(model_class, BaseModel)
+        and "overture" in key.tags
+        and _type_literal(model_class) is not None
+    )
 
-    return _type_literal(cast(type[OvertureFeature], model_class)) is not None
 
-
-def _type_literal(feature_class: type[OvertureFeature]) -> str | None:
-    """Extract the literal value from an OvertureFeature's 'type' field.
+def _type_literal(feature_class: type[BaseModel]) -> str | None:
+    """Extract the literal value from a feature model's 'type' field.
 
     Returns the literal type value, or None if not a single string literal.
     """
@@ -72,8 +75,8 @@ def _type_literal(feature_class: type[OvertureFeature]) -> str | None:
     return value if isinstance(value, str) else None
 
 
-def _discriminated_union(feature_classes: tuple[type[OvertureFeature], ...]) -> Any:  # noqa: ANN401
-    """Create a discriminated union of Overture features on the 'type' field."""
+def _discriminated_union(feature_classes: tuple[type[BaseModel], ...]) -> Any:  # noqa: ANN401
+    """Create a discriminated union of feature models on the 'type' field."""
     if not feature_classes:
         return None
     elif len(feature_classes) == 1:
@@ -94,7 +97,8 @@ def create_union_type_from_models(
 ) -> UnionType:
     """Create a union type from a dict of models.
 
-    Uses discriminated unions for OvertureFeatures when possible for better performance.
+    Uses discriminated unions for `overture`-tagged features when possible for better
+    performance.
 
     Args
     ----
@@ -107,15 +111,15 @@ def create_union_type_from_models(
     if not models:
         raise ValueError("No models provided")
 
-    model_list = list(models.values())
-
     # Separate models that can be discriminated from those that cannot
     discriminated_models = tuple(
-        cast(type[OvertureFeature], m) for m in model_list if _can_discriminate(m)
+        m for key, m in models.items() if _can_discriminate(m, key)
     )
     discriminated_union = _discriminated_union(discriminated_models)
 
-    non_discriminated_models = [m for m in model_list if not _can_discriminate(m)]
+    non_discriminated_models = [
+        m for key, m in models.items() if not _can_discriminate(m, key)
+    ]
     # Use None only if list is empty, otherwise build union
     non_discriminated_union = (
         reduce(or_, non_discriminated_models) if non_discriminated_models else None

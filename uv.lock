@@ -1055,7 +1055,6 @@ version = "2.0.0"
 source = { editable = "packages/overture-schema-cli" }
 dependencies = [
     { name = "click" },
-    { name = "overture-schema-common" },
     { name = "overture-schema-system" },
     { name = "pydantic" },
     { name = "pyyaml" },
@@ -1073,7 +1072,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1" },
-    { name = "overture-schema-common", editable = "packages/overture-schema-common" },
     { name = "overture-schema-system", editable = "packages/overture-schema-system" },
     { name = "pydantic", specifier = ">=2.13.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
@@ -1330,7 +1328,6 @@ name = "overture-schema-validation"
 version = "2.0.0"
 source = { editable = "packages/overture-schema-validation" }
 dependencies = [
-    { name = "overture-schema-common" },
     { name = "overture-schema-system" },
     { name = "pydantic" },
 ]
@@ -1343,7 +1340,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "overture-schema-common", editable = "packages/overture-schema-common" },
     { name = "overture-schema-system", editable = "packages/overture-schema-system" },
     { name = "pydantic", specifier = ">=2.12.0" },
 ]

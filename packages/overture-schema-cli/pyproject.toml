@@ -3,7 +3,6 @@ maintainers = [
     {name = "Overture Maps Schema Working Group"},
 ]
 dependencies = [
-    "overture-schema-common>=2.0.0",
     "overture-schema-system>=2.0.0",
     "pydantic>=2.13.0",
     "pyyaml>=6.0.2",
@@ -24,7 +23,6 @@ Source = "https://github.com/OvertureMaps/schema"
 Issues = "https://github.com/OvertureMaps/schema/issues"
 
 [tool.uv.sources]
-overture-schema-common = { workspace = true }
 overture-schema-system = { workspace = true }
 
 [build-system]
