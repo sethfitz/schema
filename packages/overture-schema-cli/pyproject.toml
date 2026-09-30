@@ -6,10 +6,8 @@ dependencies = [
     "overture-schema-system>=2.0.0",
     "overture-schema-validation>=2.0.0",
     "pydantic>=2.13.0",
-    "pyyaml>=6.0.2",
     "click>=8.1",
     "rich>=13.0",
-    "yamlcore>=0.0.4",
 ]
 description = "Command-line interface for Overture Maps schema validation and JSON Schema generation"
 version = "2.0.0"

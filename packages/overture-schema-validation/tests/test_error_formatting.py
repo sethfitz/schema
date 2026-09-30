@@ -9,14 +9,14 @@ from click.testing import CliRunner
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from rich.console import Console
 
-from overture.schema.cli.commands import cli
-from overture.schema.cli.error_formatting import (
+from overture.schema.validation.command import validate_command
+from overture.schema.validation.error_formatting import (
     format_path,
     group_errors_by_discriminator,
     select_most_likely_errors,
 )
-from overture.schema.cli.type_analysis import introspect_union
-from overture.schema.cli.types import ErrorLocation, ValidationErrorDict
+from overture.schema.validation.type_analysis import introspect_union
+from overture.schema.validation.types import ErrorLocation, ValidationErrorDict
 
 
 class TestErrorGrouping:
@@ -170,7 +170,7 @@ properties:
 """)
 
         result = cli_runner.invoke(
-            cli, ["validate", "--tag", "overture:theme=buildings", filename]
+            validate_command, ["--tag", "overture:theme=buildings", filename]
         )
 
         assert result.exit_code == 1
@@ -266,7 +266,7 @@ properties:
         captured_console = Console(file=buffer, force_terminal=False)
 
         with patch("overture.schema.validation.command.stderr", captured_console):
-            result = cli_runner.invoke(cli, ["validate", filename])
+            result = cli_runner.invoke(validate_command, [filename])
 
         assert result.exit_code == 1
         stderr_output = buffer.getvalue()
@@ -313,7 +313,7 @@ properties:
         captured_console = Console(file=buffer, force_terminal=False)
 
         with patch("overture.schema.validation.command.stderr", captured_console):
-            result = cli_runner.invoke(cli, ["validate", filename])
+            result = cli_runner.invoke(validate_command, [filename])
 
         assert result.exit_code == 1
         stderr_output = buffer.getvalue()

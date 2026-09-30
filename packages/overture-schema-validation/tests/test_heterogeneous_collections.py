@@ -5,9 +5,9 @@ from io import StringIO
 
 import pytest
 from click.testing import CliRunner
-from conftest import build_feature
+from feature_builder import build_feature
 
-from overture.schema.cli.commands import cli
+from overture.schema.validation.command import validate_command
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ class TestHeterogeneousCollections:
     ) -> None:
         """Test that valid heterogeneous collections pass validation."""
         result = cli_runner.invoke(
-            cli, ["validate", "-"], input=heterogeneous_collection_json
+            validate_command, ["-"], input=heterogeneous_collection_json
         )
         assert result.exit_code == 0
         assert "Successfully validated" in result.output
@@ -81,7 +81,7 @@ class TestHeterogeneousCollections:
     ) -> None:
         """Test that errors from minority types are shown, not hidden."""
         result = cli_runner.invoke(
-            cli, ["validate", "-"], input=heterogeneous_with_missing_fields_json
+            validate_command, ["-"], input=heterogeneous_with_missing_fields_json
         )
         assert result.exit_code == 1
 
@@ -108,7 +108,7 @@ class TestHeterogeneousCollections:
     ) -> None:
         """Test that heterogeneous collections trigger a warning."""
         result = cli_runner.invoke(
-            cli, ["validate", "-"], input=heterogeneous_with_missing_fields_json
+            validate_command, ["-"], input=heterogeneous_with_missing_fields_json
         )
         assert result.exit_code == 1
 
@@ -130,7 +130,7 @@ class TestHeterogeneousCollections:
             coordinates=[[[2, 2], [3, 2], [3, 3], [2, 3], [2, 2]]],
         )
         homogeneous_json = json.dumps([building1, building2])
-        result = cli_runner.invoke(cli, ["validate", "-"], input=homogeneous_json)
+        result = cli_runner.invoke(validate_command, ["-"], input=homogeneous_json)
         assert result.exit_code == 1  # Has error (missing id)
 
         stderr_output = stderr_buffer.getvalue()
@@ -163,7 +163,7 @@ class TestHeterogeneousCollections:
             "properties": {"version": 0},
         }
         ambiguous_json = json.dumps([building1, building2, ambiguous])
-        result = cli_runner.invoke(cli, ["validate", "-"], input=ambiguous_json)
+        result = cli_runner.invoke(validate_command, ["-"], input=ambiguous_json)
         assert result.exit_code == 1
 
         stderr_output = stderr_buffer.getvalue()

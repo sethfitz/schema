@@ -2,11 +2,11 @@
 
 from io import StringIO
 
-from conftest import build_feature
+from feature_builder import build_feature
 from rich.console import Console
 from rich.panel import Panel
 
-from overture.schema.cli.data_display import (
+from overture.schema.validation.data_display import (
     create_feature_display,
     extract_feature_data,
     format_field_value,

@@ -1,34 +1,43 @@
-"""Tests for CLI helper functions (load_input, perform_validation)."""
+"""Tests for the validate command's helper functions (load_input, perform_validation)."""
 
 import io
 import json
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import pytest
 import yaml
 from click.exceptions import UsageError
 from click.testing import CliRunner
-from conftest import build_feature
+from feature_builder import build_feature
 from pydantic import BaseModel, ValidationError
 
-from overture.schema.cli.commands import (
+from overture.schema.system.discovery import (
+    TagSelector,
+    discover_models,
+    filter_models,
+    model_union,
+)
+from overture.schema.validation.command import (
     _best_fit_model,
     _revalidate_undiscriminatable_items,
     load_input,
     perform_validation,
-    resolve_types,
 )
-from overture.schema.cli.type_analysis import get_item_index
-from overture.schema.cli.types import ValidationErrorDict
-from overture.schema.system.discovery import TagSelector
+from overture.schema.validation.type_analysis import get_item_index
+from overture.schema.validation.types import ValidationErrorDict
+
+
+def resolve_types(selector: TagSelector) -> Any:  # noqa: ANN401
+    """Build the union type the validate command uses for `selector`."""
+    return model_union(filter_models(discover_models(), selector))
 
 
 class TestLoadInput:
     """Tests for load_input function.
 
     Note: Happy-path file and stdin loading are covered by integration tests
-    in test_cli_commands.py. These tests focus on error cases and edge cases.
+    in test_command.py. These tests focus on error cases and edge cases.
     """
 
     def test_load_input_file_not_found(self) -> None:
@@ -204,7 +213,7 @@ class TestPerformValidation:
     """Tests for perform_validation function.
 
     Note: Happy-path validation (single features, lists, FeatureCollections, flat format)
-    is covered by integration tests in test_cli_commands.py. These tests focus on edge
+    is covered by integration tests in test_command.py. These tests focus on edge
     cases and validation logic specific to the function.
     """
 

@@ -1,0 +1,1 @@
+The `validate` command now comes from `overture-schema-validation` and union construction from `overture-schema-system`; `overture-schema` output, flags and exit codes are unchanged. The package depends on `overture-schema-validation` and no longer on `overture-schema-common`, `pyyaml` or `yamlcore`.

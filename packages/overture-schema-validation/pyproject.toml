@@ -8,7 +8,7 @@ maintainers = [
 ]
 name = "overture-schema-validation"
 version = "2.0.0"
-description = "Validation helpers for the union of all discovered Overture models"
+description = "Validation helpers and the validate command for the union of all discovered Overture models"
 requires-python = ">=3.10"
 license = "MIT"
 readme = "README.md"

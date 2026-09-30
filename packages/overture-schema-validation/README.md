@@ -25,3 +25,7 @@ feature = validate_json(geojson_text)
 The two entry points are not interchangeable. `validate` runs Pydantic's Python mode, which reads the flat column layout of the Parquet release -- the shape Overture publishes. `validate_json` runs JSON mode, which reads the GeoJSON representation the models support for compatibility with tools that expect features rather than rows. Handing a GeoJSON dict to `validate` reports `theme` and `version` missing and `type` set to `'Feature'`.
 
 Both raise `pydantic.ValidationError` when the input matches no model. Which models participate is resolved at runtime by entry-point discovery, so installing additional Overture theme packages widens what these functions accept.
+
+## The `validate` command
+
+The `overture-schema validate` command of [`overture-schema-cli`](../overture-schema-cli) is defined here, in `overture.schema.validation.command`, together with the input loading and error reporting behind it. Unlike `validate` and `validate_json`, the command can narrow the models it validates against with `--tag`, `--filter`, `--exclude` and `--type`.
