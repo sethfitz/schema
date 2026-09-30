@@ -20,7 +20,7 @@ def collect_types(tp: Any) -> set[type]:  # noqa: ANN401
     `analyze_type` (`extraction/type_analyzer.py`) that also unwraps
     `NewType`, `Literal`, `list[...]`, `dict[K, V]`, and accumulates
     constraints. A future work item is to consolidate this and the
-    similar logic in `overture-schema-cli` against that implementation.
+    similar logic in `overture-schema-validation` against that implementation.
 
     Parameters
     ----------

@@ -629,12 +629,12 @@ def validate_command(
             build_selector(tags, filters, excludes),
             type_names=types,
         )
-        if not models:
-            raise ValueError("No models found matching the specified criteria")
-        model_type = model_union(models)
     except ValueError as e:
         handle_generic_error(e, filename, "value")
         return
+    if not models:
+        raise click.UsageError("No models found matching the specified criteria")
+    model_type = model_union(models)
 
     # Load input (errors here are YAMLErrors or ValueErrors, not ValidationErrors)
     try:

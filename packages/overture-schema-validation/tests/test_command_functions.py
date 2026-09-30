@@ -28,7 +28,7 @@ from overture.schema.validation.type_analysis import get_item_index
 from overture.schema.validation.types import ValidationErrorDict
 
 
-def resolve_types(selector: TagSelector) -> Any:  # noqa: ANN401
+def _model_type(selector: TagSelector) -> Any:  # noqa: ANN401
     """Build the union type the validate command uses for `selector`."""
     return model_union(filter_models(discover_models(), selector))
 
@@ -220,9 +220,7 @@ class TestPerformValidation:
     def test_perform_validation_raises_for_invalid_single_feature(self) -> None:
         """Test that perform_validation raises ValidationError for single invalid feature."""
         data = build_feature(id=None)  # Missing required 'id'
-        model_type = resolve_types(
-            TagSelector(include_any=("overture:theme=buildings",))
-        )
+        model_type = _model_type(TagSelector(include_any=("overture:theme=buildings",)))
 
         with pytest.raises(ValidationError) as exc_info:
             perform_validation(data, model_type)
@@ -237,9 +235,7 @@ class TestPerformValidation:
             id=None, coordinates=[[[2, 2], [3, 2], [3, 3], [2, 3], [2, 2]]]
         )
         data = [feature1, feature2]
-        model_type = resolve_types(
-            TagSelector(include_any=("overture:theme=buildings",))
-        )
+        model_type = _model_type(TagSelector(include_any=("overture:theme=buildings",)))
 
         with pytest.raises(ValidationError) as exc_info:
             perform_validation(data, model_type)
@@ -251,9 +247,7 @@ class TestPerformValidation:
     def test_perform_validation_empty_list(self) -> None:
         """Test validating an empty list (edge case)."""
         data: list[dict[str, object]] = []
-        model_type = resolve_types(
-            TagSelector(include_any=("overture:theme=buildings",))
-        )
+        model_type = _model_type(TagSelector(include_any=("overture:theme=buildings",)))
 
         # Should not raise
         perform_validation(data, model_type)
@@ -261,9 +255,7 @@ class TestPerformValidation:
     def test_perform_validation_empty_feature_collection(self) -> None:
         """Test validating an empty FeatureCollection (edge case)."""
         data = {"type": "FeatureCollection", "features": []}
-        model_type = resolve_types(
-            TagSelector(include_any=("overture:theme=buildings",))
-        )
+        model_type = _model_type(TagSelector(include_any=("overture:theme=buildings",)))
 
         # Should not raise
         perform_validation(data, model_type)
@@ -273,13 +265,13 @@ class TestPerformValidation:
         data = build_feature(theme="buildings", type="building")
 
         # Should work with buildings theme
-        buildings_type = resolve_types(
+        buildings_type = _model_type(
             TagSelector(include_any=("overture:theme=buildings",))
         )
         perform_validation(data, buildings_type)
 
         # Should fail with wrong theme
-        places_type = resolve_types(TagSelector(include_any=("overture:theme=places",)))
+        places_type = _model_type(TagSelector(include_any=("overture:theme=places",)))
         with pytest.raises(ValidationError):
             perform_validation(data, places_type)
 

@@ -39,7 +39,7 @@ def resolve_types(
     if not models:
         raise ValueError("No models found matching the specified criteria")
 
-    return create_union_type_from_models(models)
+    return model_union(models)
 
 
 # Every `# noqa: D301` below is the same waiver, against `pydocstyle` (see
